@@ -254,19 +254,20 @@ class MethaneNC:
 
         ds.close()
 
-    def create_all_data_array(self, directory):
-        all_data = []
-        counter = 1
-        for filename in os.listdir(directory):
-            data, orbit = read_tropomi_nc(directory + filename)
-            reduced = reduce_data(data, orbit=orbit, limits=self.limits)
-            if len(reduced['methane']) != 0:
-                all_data.append([orbit, reduced])
-            else:
-                print(f"File number {counter}, orbit {orbit} does not contain any acceptable data")
-            print(f'File number {counter} of {len(os.listdir("tropomi_data"))} complete')
-            counter += 1
-        return all_data
+
+def create_all_data_array(limits, directory):
+    all_data = []
+    counter = 1
+    for filename in os.listdir(directory):
+        data, orbit = read_tropomi_nc(directory + filename)
+        reduced = reduce_data(data, orbit=orbit, limits=limits)
+        if len(reduced['methane']) != 0:
+            all_data.append([orbit, reduced])
+        else:
+            print(f"File number {counter}, orbit {orbit} does not contain any acceptable data")
+        print(f'File number {counter} of {len(os.listdir("tropomi_data"))} complete')
+        counter += 1
+    return all_data
 
 def reduce_data(data, orbit, qa_filter=True, limits=[(-180., -90.), (-180., 90.),
                                                      (180., 90.), (180., -90.)]):
@@ -301,23 +302,6 @@ def check_latlong_intersect(coords, test_point):
     polygon = Polygon(coords)
     point = Point(test_point[0], test_point[1])
     return polygon.contains(point)
-
-
-def plot_orbits(all_data):
-    fig, ax = plt.subplots()
-    fig.subplots_adjust(bottom=0.25)
-    ax.scatter(all_data[0][1]['longitude_cp'], all_data[0][1]['latitude_cp'],
-               c=all_data[0][1]['methane'], lw=0, marker=',')
-    orbit_ax = fig.add_axes([0.25, 0.1, 0.65, 0.03])
-    orbit_slider = Slider(ax=orbit_ax, valstep=1, valmin=0, valmax=(len(os.listdir("tropomi_data")) - 1), label="orbit")
-
-    def update_orbit(val):
-        v = int(orbit_slider.val)
-        ax.cla()
-        ax.scatter(all_data[v][1]['longitude_cp'], all_data[v][1]['latitude_cp'],
-                   c=all_data[v][1]['methane'], lw=0, marker=',')
-    orbit_slider.on_changed(update_orbit)
-    plt.show()
 
 
 if __name__ == "__main__":
