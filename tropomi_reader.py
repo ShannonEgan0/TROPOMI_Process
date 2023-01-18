@@ -7,6 +7,7 @@ import os
 from matplotlib.widgets import Slider
 from datetime import datetime
 import sys
+import csv
 
 # Main function
 def main():
@@ -188,7 +189,7 @@ class MethaneNC:
                 return 0
             else:
                 print("Quitting")
-                sys.exit()
+                raise FileExistsError("Exiting")
 
     def append_orbit_nc(self, input_dataset_filename):
         with Dataset(self.filename, "a") as f:
@@ -216,9 +217,9 @@ class MethaneNC:
             f['orbit_number'][length:] = np.full(len(reduced['methane']), orbit)
 
     # The two methods below (open and delete) are for testing purposes mainly
-    def open_file(self):
+    def open_file(self, mode='a'):
         if os.path.exists(self.filename):
-            return Dataset(self.filename, 'a')
+            return Dataset(self.filename, mode)
         else:
             raise OSError("The file no longer exists")
 
@@ -253,6 +254,22 @@ class MethaneNC:
         plt.show()
 
         ds.close()
+
+    def data_to_csv(self, columns=("timeUTC", "methane", "longitude_cp", "latitude_cp"), filename=""):
+        dataset = self.open_file()
+        if filename == "":
+            filename = self.filename + ".csv"
+        write_out = []
+        for i in columns:
+            write_out.append([i] + list(dataset[i][:]))
+
+        with open(filename, 'w') as f:
+            writer = csv.writer(f)
+            writer.writerows(list(zip(*write_out)))
+
+        print(filename)
+        dataset.close()
+        return write_out
 
 
 def create_all_data_array(limits, directory):
