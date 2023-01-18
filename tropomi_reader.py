@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import os
 from matplotlib.widgets import Slider
 from datetime import datetime
-import sys
 import csv
+
 
 # Main function
 def main():
@@ -15,12 +15,13 @@ def main():
     counter = 1
     total_files = len(os.listdir("tropomi_data"))
     time_series_file = MethaneNC("Map - TROPOMI Methane Data.nc", limits)
-    time_series_file.time_series_nc_creation()
-    directory = "tropomi_data/"
-    for filename in os.listdir(directory):
-        time_series_file.append_orbit_nc(directory + filename)
-        print(f'"File number {counter} of {total_files} complete')
-        counter += 1
+    check = time_series_file.time_series_nc_creation()
+    if check:
+        directory = "tropomi_data/"
+        for filename in os.listdir(directory):
+            time_series_file.append_orbit_nc(directory + filename)
+            print(f'"File number {counter} of {total_files} complete')
+            counter += 1
     return time_series_file
 
 
@@ -67,129 +68,131 @@ class MethaneNC:
     def time_series_nc_creation(self):
         # Need error checking in place for existing filename that matches the intended output
         filename = self.filename
-        if filename not in os.listdir():
-            with Dataset(filename, "w") as rootgrp:
-                rootgrp.location_name = self.location_name
-                rootgrp.location_bounds = str(self.limits)
-                rootgrp.sensor = "TROPOMI CH4"
-                rootgrp.information = "Recompiled data from TROPOMI netCDF4 methane sensor data referred to at " \
-                                      "http://www.tropomi.eu/data-products/methane"
-                rootgrp.creation_datetime = datetime.utcnow().isoformat().replace("T", " ")
-                rootgrp.updated_date = "None"
-
-                corner_dim = rootgrp.createDimension('corner', 4)
-                time_dim = rootgrp.createDimension('time', None)
-                layer_dim = rootgrp.createDimension('layer', 12)
-
-                orbit_number = rootgrp.createVariable('orbit_number', 'int32', 'time', zlib=True, chunksizes=(1000,),
-                                                      complevel=4)
-                orbit_number.comment = 'Swathe number increasing since beginning of data record and ' \
-                                       'correlates to data source filenames'
-                orbit_number.units = '1'
-
-                timeUTC = rootgrp.createVariable('timeUTC', 'float64', 'time', zlib=True, chunksizes=(1000,),
-                                                 complevel=4)
-                timeUTC.units = 'seconds since 2010-1-1 00:00:00'
-                timeUTC.axis = 'T'
-                timeUTC.calendar = 'gregorian'
-
-                methane_error = rootgrp.createVariable('methane_error', 'float32', 'time', zlib=True,
-                                                       chunksizes=(1000,), complevel=4)
-                methane_error.units = 'ppb'
-                methane_error.long_name = 'dry_atmosphere_mole_fraction_of_methane standard_error'
-
-                methane = rootgrp.createVariable('methane', 'float32', 'time', zlib=True,
-                                                 chunksizes=(1000,), complevel=4)
-                methane.units = 'ppb'
-                methane.long_name = 'bias corrected column-averaged dry-air mole fraction of methane'
-                methane.comment = 'This variable refers to the measued methane fraction ' \
-                                  'in the associated bounded area'
-                methane.coordinates = 'time longitude latitude'
-
-                latitude_bounds = rootgrp.createVariable('latitude_bounds', 'float32', ('time', 'corner'), zlib=True,
-                                                         chunksizes=(1000, 4), complevel=4)
-                latitude_bounds.units = 'degrees_north'
-                longitude_bounds = rootgrp.createVariable('longitude_bounds', 'float32', ('time', 'corner'), zlib=True,
-                                                          chunksizes=(1000, 4), complevel=4)
-                longitude_bounds.units = 'degrees_east'
-                latitude_bounds.comment = 'The latitudes of the corners of a pixel, ' \
-                                          'ordered counter-clockwise beginning from the South-West Corner'
-                longitude_bounds.comment = 'The longitudes of the corners of a pixel, ' \
-                                           'ordered counter-clockwise beginning from the South-West Corner'
-
-                latitude_cp = rootgrp.createVariable('latitude_cp', 'float32', 'time', zlib=True, chunksizes=(1000,),
-                                                     complevel=4)
-                longitude_cp = rootgrp.createVariable('longitude_cp', 'float32', 'time', zlib=True,
-                                                      chunksizes=(1000,), complevel=4)
-                latitude_cp.units = 'degrees_north'
-                longitude_cp.units = 'degrees_east'
-                latitude_cp.comment = 'The latitude of the mid point of a pixel'
-                longitude_cp.comment = 'The longitude of the mid point of a pixel'
-
-                surface_press = rootgrp.createVariable('surface_press', 'float32', 'time', zlib=True,
-                                                       chunksizes=(1000,), complevel=4)
-                surface_press.comment = 'surface air pressure'
-                surface_press.units = 'Pa'
-
-                pressure_int = rootgrp.createVariable('pressure_int', 'float32', 'time', zlib=True,
-                                                      chunksizes=(1000,), complevel=4)
-                pressure_int.comment = 'pressure difference between levels in the retrieval'
-                pressure_int.units = 'Pa'
-
-                sensor_azimuth = rootgrp.createVariable('sensor_azimuth', 'float32', 'time', zlib=True,
-                                                        chunksizes=(1000,),
-                                                        complevel=4)
-                sensor_azimuth.comment = 'Satellite azimuth angle at the ground pixel location on the reference ' \
-                                         'ellipsoid. Angle is measured clockwise from the North (East = 90, ' \
-                                         'South = 180, West = 270)'
-                sensor_azimuth.units = 'degree'
-
-                solar_azimuth = rootgrp.createVariable('solar_azimuth', 'float32', 'time', zlib=True,
-                                                       chunksizes=(1000,),
-                                                       complevel=4)
-                solar_azimuth.comment = 'Solar azimuth angle at the ground pixel location on the reference ' \
-                                        'ellipsoid. Angle is measured clockwise from the North (East = 90, ' \
-                                        'South = 180, West = 270)'
-                solar_azimuth.units = 'degree'
-
-                sensor_zenith = rootgrp.createVariable('sensor_zenith', 'float32', 'time', zlib=True,
-                                                       chunksizes=(1000,),
-                                                       complevel=4)
-                sensor_zenith.comment = 'Zenith angle of the satellite at the ground pixel location on the reference ' \
-                                        'ellipsoid. Angle is measured away from the vertical'
-                sensor_zenith.units = 'degree'
-
-                solar_zenith = rootgrp.createVariable('solar_zenith', 'float32', 'time', zlib=True, chunksizes=(1000,),
-                                                      complevel=4)
-                solar_zenith.comment = 'Solar zenith angle at the ground pixel location on the reference ellipsoid. ' \
-                                       'Angle is measured away from the vertical'
-                solar_zenith.units = 'degree'
-
-                column_averaging_kernel = rootgrp.createVariable('column_averaging_kernel', 'float32',
-                                                                 ('time', 'layer'),
-                                                                 zlib=True,
-                                                                 chunksizes=(1000, 12), complevel=4)
-                column_averaging_kernel.comment = 'Column averaging kernel for the methane retrieval'
-
-                methane_profile_apriori = rootgrp.createVariable('methane_profile_apriori', 'float32',
-                                                                 ('time', 'layer'),
-                                                                 zlib=True,
-                                                                 chunksizes=(1000, 12), complevel=4)
-                methane_profile_apriori.comment = 'Mole content of methane in atmosphere layer'
-                methane_profile_apriori.units = 'mol m-2'
-
-                qa = rootgrp.createVariable('qa', 'uint8', 'time', zlib=True, chunksizes=(1000,), complevel=4)
-                qa.comment = 'a continuous quality descriptor, varying between 0 (no data) and 1 ' \
-                             '(full quality data). Recommend to ignore data with qa_value < 0.5'
-                qa.scale_factor = 0.01
-                qa.units = '1'
-        else:
-            check = (input("Filename already exists, do you wish to proceed? (Y/N)")).lower()
+        if filename in os.listdir():
+            check = (input("Filename already exists, do you wish to append? (Y/N)")).lower()
             if check in ("y", "yes"):
-                return 0
+                pass
             else:
-                print("Quitting")
-                raise FileExistsError("Exiting")
+                print("Opening file without appending")
+                return 0
+        with Dataset(filename, "w") as rootgrp:
+            rootgrp.location_name = self.location_name
+            rootgrp.location_bounds = str(self.limits)
+            rootgrp.sensor = "TROPOMI CH4"
+            rootgrp.information = "Recompiled data from TROPOMI netCDF4 methane sensor data referred to at " \
+                                  "http://www.tropomi.eu/data-products/methane"
+            rootgrp.creation_datetime = datetime.utcnow().isoformat().replace("T", " ")
+            rootgrp.updated_date = "None"
+
+            corner_dim = rootgrp.createDimension('corner', 4)
+            time_dim = rootgrp.createDimension('time', None)
+            layer_dim = rootgrp.createDimension('layer', 12)
+
+            orbit_number = rootgrp.createVariable('orbit_number', 'int32', 'time', zlib=True, chunksizes=(1000,),
+                                                  complevel=4)
+            orbit_number.comment = 'Swathe number increasing since beginning of data record and ' \
+                                   'correlates to data source filenames'
+            orbit_number.units = '1'
+
+            timeUTC = rootgrp.createVariable('timeUTC', 'float64', 'time', zlib=True, chunksizes=(1000,),
+                                             complevel=4)
+            timeUTC.units = 'seconds since 2010-1-1 00:00:00'
+            timeUTC.axis = 'T'
+            timeUTC.calendar = 'gregorian'
+
+            methane_error = rootgrp.createVariable('methane_error', 'float32', 'time', zlib=True,
+                                                   chunksizes=(1000,), complevel=4)
+            methane_error.units = 'ppb'
+            methane_error.long_name = 'dry_atmosphere_mole_fraction_of_methane standard_error'
+
+            methane = rootgrp.createVariable('methane', 'float32', 'time', zlib=True,
+                                             chunksizes=(1000,), complevel=4)
+            methane.units = 'ppb'
+            methane.long_name = 'bias corrected column-averaged dry-air mole fraction of methane'
+            methane.comment = 'This variable refers to the measued methane fraction ' \
+                              'in the associated bounded area'
+            methane.coordinates = 'time longitude latitude'
+
+            latitude_bounds = rootgrp.createVariable('latitude_bounds', 'float32', ('time', 'corner'), zlib=True,
+                                                     chunksizes=(1000, 4), complevel=4)
+            latitude_bounds.units = 'degrees_north'
+            longitude_bounds = rootgrp.createVariable('longitude_bounds', 'float32', ('time', 'corner'), zlib=True,
+                                                      chunksizes=(1000, 4), complevel=4)
+            longitude_bounds.units = 'degrees_east'
+            latitude_bounds.comment = 'The latitudes of the corners of a pixel, ' \
+                                      'ordered counter-clockwise beginning from the South-West Corner'
+            longitude_bounds.comment = 'The longitudes of the corners of a pixel, ' \
+                                       'ordered counter-clockwise beginning from the South-West Corner'
+
+            latitude_cp = rootgrp.createVariable('latitude_cp', 'float32', 'time', zlib=True, chunksizes=(1000,),
+                                                 complevel=4)
+            longitude_cp = rootgrp.createVariable('longitude_cp', 'float32', 'time', zlib=True,
+                                                  chunksizes=(1000,), complevel=4)
+            latitude_cp.units = 'degrees_north'
+            longitude_cp.units = 'degrees_east'
+            latitude_cp.comment = 'The latitude of the mid point of a pixel'
+            longitude_cp.comment = 'The longitude of the mid point of a pixel'
+
+            surface_press = rootgrp.createVariable('surface_press', 'float32', 'time', zlib=True,
+                                                   chunksizes=(1000,), complevel=4)
+            surface_press.comment = 'surface air pressure'
+            surface_press.units = 'Pa'
+
+            pressure_int = rootgrp.createVariable('pressure_int', 'float32', 'time', zlib=True,
+                                                  chunksizes=(1000,), complevel=4)
+            pressure_int.comment = 'pressure difference between levels in the retrieval'
+            pressure_int.units = 'Pa'
+
+            sensor_azimuth = rootgrp.createVariable('sensor_azimuth', 'float32', 'time', zlib=True,
+                                                    chunksizes=(1000,),
+                                                    complevel=4)
+            sensor_azimuth.comment = 'Satellite azimuth angle at the ground pixel location on the reference ' \
+                                     'ellipsoid. Angle is measured clockwise from the North (East = 90, ' \
+                                     'South = 180, West = 270)'
+            sensor_azimuth.units = 'degree'
+
+            solar_azimuth = rootgrp.createVariable('solar_azimuth', 'float32', 'time', zlib=True,
+                                                   chunksizes=(1000,),
+                                                   complevel=4)
+            solar_azimuth.comment = 'Solar azimuth angle at the ground pixel location on the reference ' \
+                                    'ellipsoid. Angle is measured clockwise from the North (East = 90, ' \
+                                    'South = 180, West = 270)'
+            solar_azimuth.units = 'degree'
+
+            sensor_zenith = rootgrp.createVariable('sensor_zenith', 'float32', 'time', zlib=True,
+                                                   chunksizes=(1000,),
+                                                   complevel=4)
+            sensor_zenith.comment = 'Zenith angle of the satellite at the ground pixel location on the reference ' \
+                                    'ellipsoid. Angle is measured away from the vertical'
+            sensor_zenith.units = 'degree'
+
+            solar_zenith = rootgrp.createVariable('solar_zenith', 'float32', 'time', zlib=True, chunksizes=(1000,),
+                                                  complevel=4)
+            solar_zenith.comment = 'Solar zenith angle at the ground pixel location on the reference ellipsoid. ' \
+                                   'Angle is measured away from the vertical'
+            solar_zenith.units = 'degree'
+
+            column_averaging_kernel = rootgrp.createVariable('column_averaging_kernel', 'float32',
+                                                             ('time', 'layer'),
+                                                             zlib=True,
+                                                             chunksizes=(1000, 12), complevel=4)
+            column_averaging_kernel.comment = 'Column averaging kernel for the methane retrieval'
+
+            methane_profile_apriori = rootgrp.createVariable('methane_profile_apriori', 'float32',
+                                                             ('time', 'layer'),
+                                                             zlib=True,
+                                                             chunksizes=(1000, 12), complevel=4)
+            methane_profile_apriori.comment = 'Mole content of methane in atmosphere layer'
+            methane_profile_apriori.units = 'mol m-2'
+
+            qa = rootgrp.createVariable('qa', 'uint8', 'time', zlib=True, chunksizes=(1000,), complevel=4)
+            qa.comment = 'a continuous quality descriptor, varying between 0 (no data) and 1 ' \
+                         '(full quality data). Recommend to ignore data with qa_value < 0.5'
+            qa.scale_factor = 0.01
+            qa.units = '1'
+
+            return 1
+
 
     def append_orbit_nc(self, input_dataset_filename):
         with Dataset(self.filename, "a") as f:
