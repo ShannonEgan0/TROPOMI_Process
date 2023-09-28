@@ -84,10 +84,6 @@ class MethaneNC:
             rootgrp.creation_datetime = datetime.utcnow().isoformat().replace("T", " ")
             rootgrp.updated_date = "None"
 
-            corner_dim = rootgrp.createDimension('corner', 4)
-            time_dim = rootgrp.createDimension('time', None)
-            layer_dim = rootgrp.createDimension('layer', 12)
-
             orbit_number = rootgrp.createVariable('orbit_number', 'int32', 'time', zlib=True, chunksizes=(1000,),
                                                   complevel=4)
             orbit_number.comment = 'Swathe number increasing since beginning of data record and ' \
@@ -193,7 +189,6 @@ class MethaneNC:
 
             return 1
 
-
     def append_orbit_nc(self, input_dataset_filename):
         with Dataset(self.filename, "a") as f:
             f.updated_date = datetime.utcnow().isoformat().replace("T", " ")
@@ -289,8 +284,9 @@ def create_all_data_array(limits, directory):
         counter += 1
     return all_data
 
-def reduce_data(data, orbit, qa_filter=True, limits=[(-180., -90.), (-180., 90.),
-                                                     (180., 90.), (180., -90.)]):
+
+def reduce_data(data, orbit, qa_filter=True, limits=((-180., -90.), (-180., 90.),
+                                                     (180., 90.), (180., -90.))):
     out_dict = {}
     for i in data.keys():
         if i == 'latitude_bounds' or i == 'longitude_bounds':

@@ -5,7 +5,7 @@ import os
 
 
 def main():
-    limits = [(136.604, -20.725), (136.604, -16.725), (140.604, -16.725), (140.604, -20.725)]
+    limits = ((136.604, -20.725), (136.604, -16.725), (140.604, -16.725), (140.604, -20.725))
     files_to_download = 30
     product_type = "L2__CH4___"
     satellite_name = "TROPOMI"
@@ -40,15 +40,29 @@ def bounds_to_string(bounds):
 # Each item in list is dictionary with details returned from the query
 # dict_keys(['title', 'link', 'id', 'summary', 'ondemand', 'date', 'int', 'str'])
 def sentinel5_query(satellite, product, limits, rows):
-    if rows > 100:
-        raise ValueError("Number of rows must be <= 100 per TROPOMI limits")
-    url = f'https://s5phub.copernicus.eu/dhus/search?q= instrumentshortname:{satellite} AND ' \
-          f'producttype:{product} AND ' \
-          f'( footprint:"Intersects(POLYGON(({limits})))"' \
-          f')&rows={rows}&start=0'
-    query = requests.get(url, auth=('s5pguest', 's5pguest'))
-    a = xmltodict.parse(query.text)
-    list_of_results = a['feed']['entry']
+    list_of_results = []
+    pages, remains = rows // 100, rows % 100
+    for x in range(pages):
+        url = f'https://s5phub.copernicus.eu/dhus/search?q= instrumentshortname:{satellite} AND ' \
+              f'producttype:{product} AND ' \
+              f'( footprint:"Intersects(POLYGON(({limits})))"' \
+              f')&rows={100}&start={x * 100}'
+        query = requests.get(url, auth=('s5pguest', 's5pguest'))
+        a = xmltodict.parse(query.text)['feed']['entry']
+        for i in a:
+            list_of_results.append({"title": i['title'], "link": i['link'][0]['@href']})
+    if remains:
+        url = f'https://s5phub.copernicus.eu/dhus/search?q= instrumentshortname:{satellite} AND ' \
+              f'producttype:{product} AND ' \
+              f'( footprint:"Intersects(POLYGON(({limits})))"' \
+              f')&rows={remains}&start={pages * 100}'
+        query = requests.get(url, auth=('s5pguest', 's5pguest'))
+        a = xmltodict.parse(query.text)['feed']['entry']
+        if remains > 1:
+            for i in a:
+                list_of_results.append({"title": i['title'], "link": i['link'][0]['@href']})
+        else:
+            list_of_results.append({"title": a['title'], "link": a['link'][0]['@href']})
     return list_of_results
 
 
@@ -59,7 +73,7 @@ def download_tropomi_file(query_item, output_folder):
         os.mkdir(output_folder)
     current_archive = os.listdir(output_folder)
 
-    download_link = query_item['link'][0]['@href']
+    download_link = query_item['link']
     response = requests.get(download_link, auth=('s5pguest', 's5pguest'), stream=True)
     file_name = query_item['title'] + ".nc"
     if file_name in current_archive:
